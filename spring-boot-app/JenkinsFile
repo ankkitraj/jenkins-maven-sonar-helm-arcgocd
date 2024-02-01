@@ -9,14 +9,14 @@ pipeline {
         stage('Checkout') {
             steps {
                 sh 'echo passed'
-                // git branch: 'main', url: 'https://github.com/ankkitraj/jenkins-maven-sonar-helm-arcgocd'
+                // git branch: 'main', url: 'https://github.com/ankkitraj/jenkins-maven-sonar-helm-arcgocd.git'
             }
         }
         stage('Build and Test') {
             steps {
                 sh 'ls -ltr'
                 // build the project and create a JAR file
-                sh 'cd var/lib/jenkins/workspace/demo-pipeline/spring-boot-app && mvn clean package'
+                sh 'cd jenkins-maven-sonar-helm-arcgocd/spring-boot-app && mvn clean package'
             }
         }
         stage('Static Code Analysis') {
@@ -54,43 +54,23 @@ pipeline {
             }
         }
         stage('Update Deployment File') {
-            environment {
-                GIT_REPO_NAME = "jenkins-maven-sonar-helm-arcgocd"
-                GIT_USER_NAME = "ankkitraj"
-            }
-            steps {
-                withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-                    script {
-                        echo "Current Git Status:"
-                        sh 'git status'
-
-                        echo "Configuring Git:"
-                        sh 'git config user.email "ankkitraj4@hotmail.com"'
-                        sh 'git config user.name "ankkitraj"'
-
-                        echo 'setting branch explicitly'
-                        sh 'git checkout main'
-
-                        echo "Making Changes:"
-                        sh "sed -i 's/replaceImageTag/${BUILD_NUMBER}/g' jenkins-maven-sonar-helm-arcgocd/spring-boot-app-manifests/deployment.yml"
-                        sh "git add jenkins-maven-sonar-helm-arcgocd/spring-boot-app-manifests/deployment.yml"
-                        sh "git commit -m 'Update deployment image to version ${BUILD_NUMBER}'"
-
-                        echo "Checking out Branch:"
-                        sh 'git checkout -b feature-branch'
-                        sh "git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:feature-branch" || error "Failed to push changes"
-                    }
-                }
+        environment {
+            GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
+            GIT_USER_NAME = "ankkitraj"
+        }
+        steps {
+            withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+                sh '''
+                    git config user.email "ankkitraj4@hotmail.com"
+                    git config user.name "ankkitraj"
+                    BUILD_NUMBER=${BUILD_NUMBER}
+                    sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" jenkins-maven-sonar-helm-arcgocd/spring-boot-app-manifests/deployment.yml
+                    git add jenkins-maven-sonar-helm-arcgocd/spring-boot-app-manifests/deployment.yml
+                    git commit -m "Update deployment image to version ${BUILD_NUMBER}"
+                    git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
+                '''
             }
         }
     }
-
-    post {
-        success {
-            echo 'sucess'
-        }
-        failure {
-            echo 'failed'
-        }
-    }
+  }
 }
