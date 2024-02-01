@@ -1,0 +1,96 @@
+pipeline {
+    agent {
+        docker {
+            image 'abhishekf5/maven-abhishek-docker-agent:v1'
+            args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket to access the host's Docker daemon
+        }
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                sh 'echo passed'
+                // git branch: 'main', url: 'https://github.com/ankkitraj/Jenkins-Zero-To-Hero.git'
+            }
+        }
+        stage('Build and Test') {
+            steps {
+                sh 'ls -ltr'
+                // build the project and create a JAR file
+                sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && mvn clean package'
+            }
+        }
+        stage('Static Code Analysis') {
+            environment {
+                SONAR_URL = "http://192.168.83.147:9000"
+            }
+            steps {
+                withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
+                    sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && mvn sonar:sonar -Dsonar.login=$SONAR_AUTH_TOKEN -Dsonar.host.url=${SONAR_URL}'
+                }
+            }
+        }
+        stage('Build and Push Docker Image') {
+            environment {
+                DOCKER_IMAGE = "ankkitraj4/cicd:${BUILD_NUMBER}"
+                DOCKERFILE_LOCATION = "java-maven-sonar-argocd-helm-k8s/spring-boot-app/"
+                REGISTRY_CREDENTIALS = credentials('docker-cred')
+            }
+            steps {
+                script {
+                    // Use withCredentials to securely provide Docker registry credentials
+                    withCredentials([usernamePassword(credentialsId: 'docker-cred', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                        // Build Docker image
+                        sh "cd ${DOCKERFILE_LOCATION} && docker build -t ${DOCKER_IMAGE} ."
+
+                        // Authenticate and push Docker image
+                        sh """
+                            set -x
+                            echo \${DOCKER_PASSWORD} | docker login -u \${DOCKER_USERNAME} --password-stdin https://index.docker.io/v1/
+                            docker push ${DOCKER_IMAGE}
+                            docker logout
+                        """
+                    }
+                }
+            }
+        }
+        stage('Update Deployment File') {
+            environment {
+                GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
+                GIT_USER_NAME = "ankkitraj"
+            }
+            steps {
+                withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+                    script {
+                        echo "Current Git Status:"
+                        sh 'git status'
+
+                        echo "Configuring Git:"
+                        sh 'git config user.email "ankkitraj4@hotmail.com"'
+                        sh 'git config user.name "ankkitraj"'
+
+                        echo 'setting branch explicitly'
+                        sh 'git checkout main'
+
+                        echo "Making Changes:"
+                        sh "sed -i 's/replaceImageTag/${BUILD_NUMBER}/g' java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml"
+                        sh "git add java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml"
+                        sh "git commit -m 'Update deployment image to version ${BUILD_NUMBER}'"
+
+                        echo "Checking out Branch:"
+                        sh 'git checkout -b feature-branch'
+                        sh "git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:feature-branch" || error "Failed to push changes"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'sucess'
+        }
+        failure {
+            echo 'failed'
+        }
+    }
+}
