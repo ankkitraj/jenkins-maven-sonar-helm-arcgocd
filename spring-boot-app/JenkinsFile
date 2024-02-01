@@ -9,14 +9,14 @@ pipeline {
         stage('Checkout') {
             steps {
                 sh 'echo passed'
-                // git branch: 'main', url: 'https://github.com/ankkitraj/Jenkins-Zero-To-Hero.git'
+                // git branch: 'main', url: 'https://github.com/ankkitraj/jenkins-maven-sonar-helm-arcgocd'
             }
         }
         stage('Build and Test') {
             steps {
                 sh 'ls -ltr'
                 // build the project and create a JAR file
-                sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && mvn clean package'
+                sh 'cd jenkins-maven-sonar-helm-arcgocd/spring-boot-app && mvn clean package'
             }
         }
         stage('Static Code Analysis') {
@@ -25,14 +25,14 @@ pipeline {
             }
             steps {
                 withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
-                    sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && mvn sonar:sonar -Dsonar.login=$SONAR_AUTH_TOKEN -Dsonar.host.url=${SONAR_URL}'
+                    sh 'cd jenkins-maven-sonar-helm-arcgocd/spring-boot-app && mvn sonar:sonar -Dsonar.login=$SONAR_AUTH_TOKEN -Dsonar.host.url=${SONAR_URL}'
                 }
             }
         }
         stage('Build and Push Docker Image') {
             environment {
                 DOCKER_IMAGE = "ankkitraj4/cicd:${BUILD_NUMBER}"
-                DOCKERFILE_LOCATION = "java-maven-sonar-argocd-helm-k8s/spring-boot-app/"
+                DOCKERFILE_LOCATION = "jenkins-maven-sonar-helm-arcgocd/spring-boot-app/"
                 REGISTRY_CREDENTIALS = credentials('docker-cred')
             }
             steps {
@@ -55,7 +55,7 @@ pipeline {
         }
         stage('Update Deployment File') {
             environment {
-                GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
+                GIT_REPO_NAME = "jenkins-maven-sonar-helm-arcgocd"
                 GIT_USER_NAME = "ankkitraj"
             }
             steps {
@@ -72,8 +72,8 @@ pipeline {
                         sh 'git checkout main'
 
                         echo "Making Changes:"
-                        sh "sed -i 's/replaceImageTag/${BUILD_NUMBER}/g' java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml"
-                        sh "git add java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml"
+                        sh "sed -i 's/replaceImageTag/${BUILD_NUMBER}/g' jenkins-maven-sonar-helm-arcgocd/spring-boot-app-manifests/deployment.yml"
+                        sh "git add jenkins-maven-sonar-helm-arcgocd/spring-boot-app-manifests/deployment.yml"
                         sh "git commit -m 'Update deployment image to version ${BUILD_NUMBER}'"
 
                         echo "Checking out Branch:"
