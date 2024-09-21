@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: jenkins-maven-sonar-helm-arcgocd
+  description: Description of the jenkins-maven-sonar-helm-arcgocd repository
+  annotations:
+    github.com/project-slug: ankkitraj/jenkins-maven-sonar-helm-arcgocd
+spec:
+  type: service
+  owner: ankkitraj
+  lifecycle: production
+  system: my-system
+  links:
+    - url: https://github.com/ankkitraj/jenkins-maven-sonar-helm-arcgocd
+      title: Repository
